@@ -52,9 +52,10 @@ function endGame (game) {
     if (game.gameState.score > game.gameState.max_score) {
         game.gameState.max_score = game.gameState.score
     }
+    game.gameState.isRun = false
     game.ws.send(JSON.stringify({
         type: 'endgame',
-        max_score: game.gameState.max_score,
+        gameState: game.gameState,
     }));
 }
 
@@ -155,8 +156,9 @@ function moveLasers(lasers, missiles) {
 
 
 
-function startGame(game, session) {
+function startGame(game) {
     game.ival = setInterval(() => {
+        game.gameState.isRun=true;
         moveMissiles(game.gameState.missiles, game);
         moveLasers(game.gameState.lasers, game.gameState.missiles);
         game.gameState.counter++;
@@ -167,13 +169,9 @@ function startGame(game, session) {
         if (game.gameState.counter % 20 === 0) {
             clearInterval(game.ival);
             game.gameState.speed = Math.round(game.gameState.speed / 2);
-            startGame(game, session);
+            startGame(game);
         }
 
-        if (game.gameState.score > session.max_score) {
-            session.max_score = game.gameState.score;
-            session.save();
-        }
         broadcastGameState(game)
 
     }, game.gameState.speed);

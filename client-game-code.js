@@ -699,14 +699,31 @@ const gameConfig = {
 gameConfig.initializeImages();
 gameConfig.music.audio.loop = true;
 
+
+// Объект состояния игры
+const gameState = {
+    xSh: gameConfig.mid.x,
+    ySh: gameConfig.mid.y,
+    rSh: 0,
+    missiles: [],
+    lasers: [],
+    score: 0,
+    speed: 1000,
+    counter: 0,
+    max_score: 0,
+    shipImgOption: "Ship 1",
+    isRun: false
+};
+
+
 // Функции для управления игрой
 const gameActions = {
-    createNewGame() {
-        webSocketHandler.sendMessage('firstGame');
+    openGame() {
+        webSocketHandler.sendMessage('openGame');
     },
 
     observeGame(selectedGameId) {
-        if (webSocketHandler.isRun) {
+        if (gameState.isRun) {
             alert("Warning! You can not observe while you are playing the game!");
         } else if (selectedGameId !== webSocketHandler.gameId && selectedGameId !== webSocketHandler.gameIdObserver) {
             webSocketHandler.sendMessage('observe', { gameIdObserver: selectedGameId });
@@ -722,7 +739,7 @@ const gameActions = {
             webSocketHandler.sendMessage('restart');
             uiElements.showMessage("Restarted", 1);
         }
-        webSocketHandler.isRun = true;
+        gameState.isRun = true;
     },
 
     backToRoom() {
@@ -779,19 +796,6 @@ const gameActions = {
     }
 };
 
-// Объект состояния игры
-const gameState = {
-    xSh: gameConfig.mid.x,
-    ySh: gameConfig.mid.y,
-    rSh: 0,
-    missiles: [],
-    lasers: [],
-    score: 0,
-    speed: 1000,
-    counter: 0,
-    max_score: 0,
-    shipImgOption: "Ship 1"
-};
 
 // Элементы интерфейса
 const uiElements = {
@@ -813,13 +817,19 @@ const uiElements = {
 
     shipSelect: document.createElement('select'),
 
+    registrationForm: document.createElement('form'),
+    loginForm: document.createElement('form'),
+    showUsersBtn: document.createElement('button'),
+    usersList: document.createElement('ul'),
+
     initialize() {
         document.body.appendChild(this.gameList);
         document.body.appendChild(this.observerInfo);
         document.body.appendChild(this.messageBlock);
 
-        this.restartBtn.textContent = 'Restart Game';
+        this.restartBtn.textContent = 'Start Game';
         this.restartBtn.onclick = gameActions.restartGame;
+        this.restartBtn.style.display = "block"
         document.body.appendChild(this.restartBtn);
 
         this.backBtn.textContent = 'Back to Your Room';
@@ -828,10 +838,12 @@ const uiElements = {
         document.body.appendChild(this.backBtn);
 
         this.musicBtn.textContent = 'Play Music';
+        this.restartBtn.style.display = "block"
         this.musicBtn.onclick = gameActions.musicHandler;
         document.body.appendChild(this.musicBtn);
 
         this.debugBtn.textContent = 'Turn Debug On';
+        this.debugBtn.style.display = "block"
         this.debugBtn.onclick = gameActions.debugHandler;
         this.debugDetailsList.style.display = 'none'
         this.laserInfoItem.textContent = `Amount of the active lasers ${gameState.lasers.length} ~ Coordinates:`
@@ -848,8 +860,65 @@ const uiElements = {
         this.initShipOptions()
         this.shipSelect.style.display = 'block'
         this.shipSelect.onchange = gameActions.shipImageHandler.bind(this);
-        document.body.appendChild(this.shipSelect)
+        document.body.appendChild(this.shipSelect);
+
+        this.createRegistrationForm();
+        this.createLoginForm();
+
+        this.showUsersBtn.textContent = 'Show Registered Users';
+        this.showUsersBtn.onclick = this.displayUsers.bind(this);
+        document.body.appendChild(this.showUsersBtn);
+        document.body.appendChild(this.usersList);
     },
+
+    displayUsers() {
+        fetch('/get-users')
+        .then(response => response.json())
+        .then(users => {
+            this.usersList.innerHTML = '';
+
+            users.forEach(user => {
+                const listItem = document.createElement('li');
+                listItem.textContent = `Name: ${user.name}, Email: ${user.email}`;
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.textContent = 'Delete';
+                deleteBtn.onclick = () => this.deleteUser(user.name);
+                listItem.appendChild(deleteBtn);
+
+                this.usersList.appendChild(listItem);
+            });
+        })
+        .catch(error => {
+            console.error('Error fetching users:', error);
+        });
+    },
+
+    nonAdminDisplayUsers(){
+        this.showUsersBtn.style.display = 'none'
+    },
+
+
+    deleteUser(name) {
+        fetch('/delete-user', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(data.message);
+                this.displayUsers();
+            } else {
+                alert(`Error: ${data.message}`);
+            }
+        })
+        .catch(error => {
+            console.error('Error deleting user:', error);
+        });
+    },
+
 
     initShipOptions() {
         for (const [name, url] of Object.entries(gameConfig.shipImages)) {
@@ -858,6 +927,172 @@ const uiElements = {
             option.textContent = name;
             this.shipSelect.appendChild(option);
         }
+    },
+
+    createRegistrationForm() {
+        // Заголовок
+        const title = document.createElement('h3');
+        title.textContent = 'Register';
+        this.registrationForm.id = 'registrationForm';
+        this.registrationForm.appendChild(title);
+
+        // Поле Email
+        const emailInput = document.createElement('input');
+        emailInput.type = 'email';
+        emailInput.placeholder = 'Email';
+        emailInput.name = 'email';
+        emailInput.required = true;
+        this.registrationForm.appendChild(emailInput);
+        
+        // Поле Name
+        const nameInput = document.createElement('input');
+        nameInput.type = 'text';
+        nameInput.placeholder = 'Name';
+        nameInput.name = 'name';
+        nameInput.required = true;
+        this.registrationForm.appendChild(nameInput);
+
+        // Поле Password
+        const passwordInput = document.createElement('input');
+        passwordInput.type = 'password';
+        passwordInput.placeholder = 'Password';
+        passwordInput.name = 'password'
+        passwordInput.required = true;
+        this.registrationForm.appendChild(passwordInput);
+
+        // Поле Confirm Password
+        const confirmPasswordInput = document.createElement('input');
+        confirmPasswordInput.type = 'password';
+        confirmPasswordInput.name = 'confirmPassword';
+        confirmPasswordInput.placeholder = 'Confirm Password';
+        confirmPasswordInput.required = true;
+        this.registrationForm.appendChild(confirmPasswordInput);
+
+        // Кнопка регистрации
+        const registerButton = document.createElement('button');
+        registerButton.type = 'button';
+        registerButton.textContent = 'Register';
+        registerButton.onclick = () => this.handleRegistration(emailInput.value, nameInput.value, passwordInput.value, confirmPasswordInput.value);
+        this.registrationForm.appendChild(registerButton);
+        
+
+        // this.registrationForm.append(emailInput, nameInput, passwordInput, confirmPasswordInput, registerButton);
+        // this.registrationForm.addEventListener("submit", this.handleRegistration.bind(this));
+        document.body.appendChild(this.registrationForm);
+    },
+
+    hideRegistrationForm() {
+        this.registrationForm.style.display = 'none';
+        this.loginForm.style.display = 'none'
+    },
+
+    createLoginForm() {
+        // Заголовок
+        const title = document.createElement('h3');
+        title.textContent = 'Login';
+        this.loginForm.appendChild(title);
+
+        // Поле Email
+        const nameInput = document.createElement('input');
+        nameInput.type = 'name';
+        nameInput.placeholder = 'Name'
+        nameInput.name = 'name';
+        this.loginForm.appendChild(nameInput);
+
+        // Поле Password
+        const passwordInput = document.createElement('input');
+        passwordInput.type = 'password';
+        passwordInput.placeholder = 'Password'
+        passwordInput.name = 'password';
+        this.loginForm.appendChild(passwordInput);
+
+        // Кнопка входа
+        const loginButton = document.createElement('button');
+        loginButton.type = 'button';
+        loginButton.textContent = 'Login';
+        loginButton.onclick = () => this.handleLogin(nameInput.value, passwordInput.value);
+        this.loginForm.appendChild(loginButton);
+
+        document.body.appendChild(this.loginForm);
+    },
+
+    handleRegistration(email, name, password, confirmPassword) {
+
+        console.log("NAME: ", name)
+
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/; // 3@3.2
+        const nameRegex = /^[a-zA-Z]+$/; // [a-zA-Z]
+
+        if (!email || !name || !password || !confirmPassword) {
+            alert('All fields are required');
+            return;
+        }
+
+        if (name === null) {
+            alert('Name can not be "null"');
+            return;
+        }
+
+        if (password !== confirmPassword) {
+            alert('Passwords do not match');
+            return;
+        }
+
+        if (!emailRegex.test(email)) {
+            alert('Invalid email format');
+            return;
+        }
+
+        if (!nameRegex.test(name)) {
+            alert('Name should contain only letters');
+            return;
+        }
+
+        fetch('/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, name, password, gameId: webSocketHandler.gameId })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                webSocketHandler.name = name
+                this.hideRegistrationForm()
+                alert(`${data.message}`);
+            } else {
+                alert(`Error: ${data.message}`);
+            }
+        })
+        .catch(error => console.error('Registration error:', error));
+    },
+
+
+    handleLogin(name, password) {
+        fetch('/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, password, gameId: webSocketHandler.gameId })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                webSocketHandler.name = name
+                this.hideRegistrationForm()
+                alert(`${data.message}`);
+            } else {
+                alert(`Error: ${data.message}`);
+            }
+        })
+        .catch(error => console.error('Login error:', error));
+    },
+
+
+    invisibleRestartBtn() {
+        this.restartBtn.style.display = "none"
+    },
+
+    visibleRestartBtn() {
+        this.restartBtn.style.display = "block"
     },
 
     updateGameList(games) {
@@ -875,8 +1110,6 @@ const uiElements = {
 
     showEndGameMessage(newMaxScore) {
         this.showMessage(newMaxScore ? "Game Over! New Max Score" : "Game Over", 2);
-        this.restartBtn.disabled = false;
-        webSocketHandler.isRun = false;
         if (webSocketHandler.role === 'player') this.restartBtn.style.display = 'block';
     },
 
@@ -978,15 +1211,15 @@ displayHandler.initialize();
 // Объект для работы с WebSocket
 const webSocketHandler = {
     ws: new WebSocket('ws://localhost:8082'),
-    gameId: null,
+    gameId: localStorage.getItem('sessionId'),
     gameIdObserver: null,
     role: null,
-    isRun: false,
+    name: null,
 
     initialize() {
         this.ws.onopen = () => {
             console.log("WebSocket connection established.");
-            gameActions.createNewGame();
+            gameActions.openGame();
         };
         this.ws.onmessage = this.handleMessage.bind(this);
     },
@@ -1005,7 +1238,20 @@ const webSocketHandler = {
                     Object.assign(gameState, message.gameState);
                     this.gameIdObserver = message.gameId;
                 } else {
+                    if ((!this.gameId && message.gameId) || (this.gameId !== message.gameId)) {
+                        sessionId = message.gameId;
+                        localStorage.setItem('sessionId', sessionId);
+                    }
                     this.gameId = message.gameId;
+                    if (message.gameState !== undefined) Object.assign(gameState, message.gameState);
+                    if (gameState.isRun){
+                        uiElements.invisibleRestartBtn()
+                    }
+                    if (message.name) this.name = message.name
+                    console.log("name: ", this.name)
+                    if (this.name !== null) uiElements.hideRegistrationForm()
+                    console.log("NAMEANE:", this.name )
+                    if (this.name !== 'admin') uiElements.nonAdminDisplayUsers()
                 }
                 break;
 
@@ -1028,11 +1274,13 @@ const webSocketHandler = {
                 break;
 
             case 'endgame':
-                uiElements.showEndGameMessage(message.max_score === gameState.score);
+                uiElements.showEndGameMessage(message.gameState.max_score === gameState.score);
+                if (message.gameState !== undefined) Object.assign(gameState, message.gameState);
                 break;
 
             case 'success-restart':
                 uiElements.showMessage("Start new game...", 1);
+                uiElements.restartBtn.style.display = "none"
                 break;
         }
 
@@ -1044,7 +1292,7 @@ webSocketHandler.initialize();
 // Обработчик нажатия клавиш
 // Обработчик нажатий кнопок с использованием HTTP-запросов
 window.addEventListener('keydown', (event) => {
-    if (webSocketHandler.role === 'player') { // Проверяем, что текущий пользователь — игрок
+    if (webSocketHandler.role === 'player' && gameState.isRun) { // Проверяем, что текущий пользователь — игрок
         const allowedKeys = ['KeyJ', 'KeyL', 'ArrowLeft', 'ArrowRight', 'Space'];
         
         if (allowedKeys.includes(event.code)) {
@@ -1059,7 +1307,6 @@ window.addEventListener('keydown', (event) => {
             })
             .then(response => response.json())
             .then(data => {
-                console.log("Server response:", data);
 
                 // Локально обновляем игру в зависимости от ответа сервера
                 if (data.state) {
