@@ -7,6 +7,12 @@ var mid = {
     y: (yFields-1)/2
 };
 
+// var mid = {
+//     x: 500 / 10 / 2,
+//     y: 500 / 10 / 2
+// };
+
+
 
 
 
@@ -149,7 +155,7 @@ function moveLasers(lasers, missiles) {
 
 
 
-function startGame(game) {
+function startGame(game, session) {
     game.ival = setInterval(() => {
         moveMissiles(game.gameState.missiles, game);
         moveLasers(game.gameState.lasers, game.gameState.missiles);
@@ -161,9 +167,13 @@ function startGame(game) {
         if (game.gameState.counter % 20 === 0) {
             clearInterval(game.ival);
             game.gameState.speed = Math.round(game.gameState.speed / 2);
-            startGame(game, game.gameState);
+            startGame(game, session);
         }
 
+        if (game.gameState.score > session.max_score) {
+            session.max_score = game.gameState.score;
+            session.save();
+        }
         broadcastGameState(game)
 
     }, game.gameState.speed);

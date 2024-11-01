@@ -67,9 +67,9 @@ wss.on('connection', (ws) => {
             case 'player':
                 returnToPlayer(ws, data.gameId, data.gameIdObserver);
                 break;
-            case 'action':
-                if (gameId) handleAction(gameId, data.action);
-                break;
+            // case 'action':
+            //     if (gameId) handleAction(gameId, data.action);
+            //     break;
             case 'restart':
                 if (gameId) restartGame(gameId);
                 break;
@@ -135,12 +135,12 @@ function returnToPlayer(ws, gameId, gameIdObserver) {
 }
 
 
-function handleAction(gameId, action) {
-    if (games[gameId]) {
-        utils.updateGameState(games[gameId].gameState, action);
-        utils.broadcastGameState(games[gameId]);
-    }
-}
+// function handleAction(gameId, action) {
+//     if (games[gameId]) {
+//         // utils.updateGameState(games[gameId].gameState, action);
+//         utils.broadcastGameState(games[gameId]);
+//     }
+// }
 
 
 function restartGame(gameId) {
