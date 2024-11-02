@@ -47,11 +47,43 @@ function addMissile(missiles) {
 }
 
 
-function endGame (game) {
+function endGame (game, users) {
     clearInterval(game.ival);
+
+    let user = null
+    const name = game.name
+    console.log("--------END GAME--------")
+
+    console.log("Users:", users)
+
+    console.log("User:", user)
+    console.log("Name:", name)
+
+    if (users && name) {
+        console.log("OK")
+        user = users.find(u => u.name === name);
+        console.log("USER2:", user)
+    }
+
     if (game.gameState.score > game.gameState.max_score) {
         game.gameState.max_score = game.gameState.score
+        if (user) user.maxScore = game.gameState.max_score
+        console.log("NEW Max Score")
     }
+    if (game.gameState.speed < game.gameState.max_speed) {
+        game.gameState.max_speed = game.gameState.speed
+        if (user) user.maxSpeed = game.gameState.max_speed
+        console.log("NEW Max Speed")
+    }
+    if (user && user.shipImgOption !== game.gameState.shipImgOption){
+        user.shipImgOption = game.gameState.shipImgOption
+        console.log("NEW Ship Img")
+    }
+
+    console.log("User:", user)
+
+    console.log("----------------------")
+
     game.gameState.isRun = false
     game.ws.send(JSON.stringify({
         type: 'endgame',
@@ -59,7 +91,7 @@ function endGame (game) {
     }));
 }
 
-function moveMissiles(missiles, game) {
+function moveMissiles(missiles, game, users) {
     for (let i = 0; i < missiles.length; i++) {
         const missile = missiles[i];
         const m = (missile.y - mid.y) / (missile.x - mid.x);
@@ -83,7 +115,7 @@ function moveMissiles(missiles, game) {
     }
 
     if (collision(missiles)) {
-        endGame(game);
+        endGame(game, users);
     }
 }
 
@@ -156,10 +188,10 @@ function moveLasers(lasers, missiles) {
 
 
 
-function startGame(game) {
+function startGame(game, users) {
     game.ival = setInterval(() => {
         game.gameState.isRun=true;
-        moveMissiles(game.gameState.missiles, game);
+        moveMissiles(game.gameState.missiles, game, users);
         moveLasers(game.gameState.lasers, game.gameState.missiles);
         game.gameState.counter++;
         game.gameState.score += 10;
@@ -169,7 +201,7 @@ function startGame(game) {
         if (game.gameState.counter % 20 === 0) {
             clearInterval(game.ival);
             game.gameState.speed = Math.round(game.gameState.speed / 2);
-            startGame(game);
+            startGame(game, users);
         }
 
         broadcastGameState(game)
@@ -179,14 +211,14 @@ function startGame(game) {
 }
 
 
-function restartFunc(game, gameState){
+function restartFunc(game, gameState, users){
     clearInterval(game.ival)
     gameState.missiles = []
     gameState.lasers = []
     gameState.speed = 1000
     gameState.score = 0
     gameState.counter = 0
-    startGame(game)
+    startGame(game, users)
 }
 
 
