@@ -25,7 +25,7 @@ app.use(express.text());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-const mid = { x: 29, y: 29 };
+
 
 
 function findUser(email, name) {
@@ -36,8 +36,8 @@ function findUser(email, name) {
 
 function initializeGameState(maxScore = 0) {
     return {
-        xSh: mid.x,
-        ySh: mid.y,
+        xSh: 29,
+        ySh: 29,
         rSh: 0,
         missiles: [],
         lasers: [],
@@ -51,20 +51,6 @@ function initializeGameState(maxScore = 0) {
     };
 }
 
-
-// function broadcastGameList() {
-    // const gameListMessage = JSON.stringify({
-    //     type: 'gameList',
-    //     games: games,
-    // });
-    // wss.clients.forEach(client => {
-    //     if (client.readyState === WebSocket.OPEN) {
-    //         client.send(gameListMessage);
-    //     }
-    // });
-// }
-
-
 wss.on('connection', (ws) => {
     let gameId = null;
 
@@ -74,7 +60,6 @@ wss.on('connection', (ws) => {
 
             case 'openGame':
                 gameId = data.gameId || uuidv4()
-                console.log("openGAME RECEIVED")
                 openGame(ws, gameId)
                 break;
             case 'newGame':
@@ -89,9 +74,6 @@ wss.on('connection', (ws) => {
             case 'restart':
                 if (gameId) restartGame(gameId);
                 break;
-            case 'image':
-                if (gameId) changeImage(data.gameId, data.shipImgOption);
-                break;
         }
     });
 
@@ -100,10 +82,20 @@ wss.on('connection', (ws) => {
     });
 });
 
+// app.post('/open-game', (req, res) => {
+//     const { ws, gameId } = req.body;
 
-function changeImage(gameId, shipImgOption){
-    games[gameId].gameState.shipImgOption = shipImgOption
-}
+//     openGame(ws, gameId)
+
+//     res.json({ message: 'Key press processed successfully', state: room.gameState });
+// });
+
+
+// function changeImage(gameId, shipImgOption, name){
+//     games[gameId].gameState.shipImgOption = shipImgOption
+//     const user = users.find(u => u.name === name);
+//     user.shipImgOption = shipImgOption
+// }
 
 
 function openGame(ws, gameId) {
@@ -132,8 +124,6 @@ function openGame(ws, gameId) {
 
 function startGame(gameId) {
     if (games[gameId]) {
-        console.log("START GAME")
-        console.log(users)
         utils.startGame(games[gameId], users);
     }
 }
@@ -164,18 +154,8 @@ function returnToPlayer(ws, gameId, gameIdObserver) {
 }
 
 
-// function handleAction(gameId, action) {
-//     if (games[gameId]) {
-//         // utils.updateGameState(games[gameId].gameState, action);
-//         utils.broadcastGameState(games[gameId]);
-//     }
-// }
-
-
 function restartGame(gameId) {
-    console.log("RESTART GAME BEFORE")
     if (games[gameId]) {
-        console.log("RESTART GAME")
         utils.restartFunc(games[gameId], games[gameId].gameState, users);
         games[gameId].ws.send(JSON.stringify({ type: 'success-restart' }));
     }
@@ -229,8 +209,6 @@ app.post('/register', async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     users.push({ email: email, name: name, password: hashedPassword, maxScore: games[gameId].gameState.max_score,  maxSpeed: games[gameId].gameState.max_speed,  shipImgOption: games[gameId].gameState.shipImgOption  });
-    console.log("REGISTRATION:")
-    console.log(users)
     games[gameId].name = name
     res.status(201).json({ success: true, message: 'Registration successful' });
 });
@@ -249,8 +227,6 @@ app.post('/login', async (req, res) => {
         return res.status(400).json({ message: 'Invalid email or password' });
     }
 
-    console.log("LOGIN:", user)
-
     games[gameId].name = name
     games[gameId].gameState.max_score = user.maxScore
     // games[gameId].gameState.maxSpeed = user.maxSpeed
@@ -260,13 +236,10 @@ app.post('/login', async (req, res) => {
 
 
 
+
+
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
-});
-
-
-app.get('/get-users', (req, res) => {
-    if (users) res.json(users.map(user => ({ email: user.email, name: user.name }))); 
 });
 
 
@@ -284,6 +257,23 @@ app.delete('/delete-user', (req, res) => {
 });
 
 
+app.post('/change-ship-img', (req, res) => {
+    const { name, shipImgOption, gameId } = req.body;
+
+
+    if (games[gameId]) {
+        games[gameId].gameState.shipImgOption = shipImgOption;
+        if (name !== null){
+            const user = users.find(u => u.name === name);
+            user.shipImgOption = shipImgOption;
+        }
+        res.json({ success: true });
+    } else {
+        res.status(404).json({ success: false, message: 'Change Ship Image Error' });
+    }
+});
+
+
 app.get('/get-users-data', (req, res) => {
     const data = users.map(user => ({
         name: user.name,
@@ -296,64 +286,80 @@ app.get('/get-users-data', (req, res) => {
 });
 
 
-function transformDict(originalDict) {
-    return Object.entries(originalDict).reduce((acc, [id, data]) => {
-        acc[id] = {
-            name: data.name,
-            isRun: data.gameState.isRun,
-        };
-        return acc;
-    }, {});
-}
+app.get('/get-users', (req, res) => {
+
+    const usersList = [
+        { "tag": "ul", "id": "usersList", "innerTags": [] }
+    ];
+
+    users.forEach(user => {
+        usersList[0].innerTags.push(
+            {
+                "tag": "li",
+                "textContent": `Name: ${user.name}, Email: ${user.email}`,
+                "innerTags": [
+                    {"tag": "button", "textContent": "Delete", "onclick": "deleteUser", "args": [`${user.name}`] }
+                ]
+            },
+    );
+    });
+
+
+    res.json(usersList); 
+});
 
 
 app.get('/get-active-games', (req, res) => {
-    const transformedGames = transformDict(games);
 
-    res.json({ success: true, games: transformedGames, message: 'User deleted successfully' });
+    const gameId = req.query.gameId;
+
+
+    const transformedGames = utils.transformDict(games);
+    const activeGameList = [
+        { "tag": "ul", "id": "gameListUl", "innerTags": [] }
+    ];
+
+    let size = 0
+    Object.entries(transformedGames).forEach(([id, game]) => {
+        if (game.isRun){
+            if (gameId === id) {
+                activeGameList[0].innerTags.push({
+                    "tag": "li",
+                    "textContent": `Your own room - ${game.name} : ${id}`,
+                    "style": { "color": "orange" }
+                });
+            }
+            else {
+                activeGameList[0].innerTags.push({
+                    "tag": "li",
+                    "textContent": `${game.name} : ${id}`,
+                    "onclick": "observeGame",
+                    "args": [`${id}`],
+                    "style": { "cursor": "pointer", "color": "green", "textDecoration": "underline" }
+                });
+            }
+            size++
+        }
+    });
+    if (size < 1){
+        activeGameList[0].innerTags.push({
+            "tag": "li",
+            "textContent": `no active games yet`,
+        });
+    }
+
+    res.json({ success: true, activeGameList });
 });
 
 
 app.post('/upload-csv', (req, res) => {
     const csvContent = req.body;
-    const parsedUsers = parseCSV(csvContent);
+    const parsedUsers = utils.parseCSV(csvContent, users);
 
     users.push(...parsedUsers);
 
     res.json({ success: true, message: 'Файл успешно обработан' });
 });
-
-
-function parseCSV(data) {
-    const lines = data.split('\n');
-    const result = [];
-
-    const headers = lines[0].split(',');
-
-    for (let i = 1; i < lines.length; i++) {
-        const row = lines[i].split(',');
-        if (row.length === headers.length) {
-            const user = {
-                name: row[0].trim(),
-                email: row[1].trim(),
-                password: row[2].trim(),
-                maxScore: parseInt(row[3].trim(), 10) || 0,
-                maxSpeed: parseInt(row[4].trim(), 10) || 0
-            };
-
-            const existingUserIndex = users.findIndex(
-                u => u.email === user.email || u.name === user.name
-            );
-
-            if (existingUserIndex !== -1) {
-                users.splice(existingUserIndex, 1);
-            }
-
-            result.push(user);
-        }
-    }
-    return result;
-}
 
 
 app.get('/download-users-csv', (req, res) => {
@@ -383,13 +389,7 @@ app.get('/page-structure', (req, res) => {
         { "tag": "button", "id": "backBtn", "textContent": "Back to Your Room", "onclick": "backToRoom", "style": { "display": "none" } },
         { "tag": "button", "id": "musicBtn", "textContent": "Play Music", "onclick": "musicHandler" },
         { "tag": "button", "id": "debugBtn", "textContent": "Turn Debug On", "onclick": "debugHandler" },
-        {
-            "tag": "canvas",
-            "id": "gameCanvas",
-            "width": 500,
-            "height": 500,
-            "initialize": "displayHandler.initialize"
-        },
+
         { "tag": "ul", "id": "debugDetailsList", "style": { "display": "none" }, "innerTags": [
             { "tag": "li", "id": "laserInfoItem", "textContent": "Amount of the active lasers" },
             { "tag": "li", "id": "missileInfoItem", "textContent": "Amount of the active missiles" }
@@ -398,16 +398,47 @@ app.get('/page-structure', (req, res) => {
         { "tag": "p", "id": "scoreItem" },
         { "tag": "p", "id": "speedItem" },
         { "tag": "p", "id": "maxScore" },
-        { "tag": "select", "id": "shipSelect", "onchange": "shipImageHandler" },
-        // { "tag": "form", "id": "registrationForm" },
-        // { "tag": "form", "id": "loginForm" },
+
+
+
+        { "tag": "select", "id": "shipSelect", "onchange": "shipImageHandler", "innerTags": [
+            { "tag": "option", "textContent": "Ship 1", "value": "Ship 1"},
+            { "tag": "option", "textContent": "Ship 2", "value": "Ship 2"},
+            { "tag": "option", "textContent": "Ship 3", "value": "Ship 3"},
+        ]
+        },
+
+
+
+
+        { "tag": "form", "id": "registrationForm", "innerTags": [
+            { "tag": "h3", "id": "registrationTitle", "textContent": "Register" },
+            { "tag": "input", "id": "emailInput", "type": "email", "placeholder": "Email", "name": "email", "required": true },
+            { "tag": "input", "id": "nameInput", "type": "text", "placeholder": "Name", "name": "name", "required": true },
+            { "tag": "input", "id": "passwordInput", "type": "password", "placeholder": "Password", "name": "password", "required": true },
+            { "tag": "input", "id": "confirmPassword", "type": "password", "placeholder": "Confirm Password", "name": "confirmPassword", "required": true },
+            { "tag": "button", "id": "registerButton", "textContent": "Register", "type": "button", "onclick": "handleRegistration",  "args": ["emailInput", "nameInput", "passwordInput", "confirmPassword"] },
+        ] },
+        { "tag": "form", "id": "loginForm", "innerTags": [
+            { "tag": "h3", "id": "registrationTitle", "textContent": "Login" },
+            { "tag": "input", "id": "nameLoginInput", "type": "text", "placeholder": "Name", "name": "name", "required": true },
+            { "tag": "input", "id": "passwordLoginInput", "type": "password", "placeholder": "Password", "name": "password", "required": true },
+            { "tag": "button", "id": "loginButton", "textContent": "Login", "type": "button", "onclick": "handleLogin",  "args": ["nameLoginInput", "passwordLoginInput"] },
+        ] },
         { "tag": "div", "id": "adminDiv", "innerTags": [
             { "tag": "button", "id": "csvDownloadBtn", "textContent": "Download CSV", "onclick": "csvDownloadHandler" },
             { "tag": "input", "id": "csvInput", "type": "file", "accept": ".csv" },
             { "tag": "button", "id": "csvUploadBtn", "textContent": "Upload CSV", "onclick": "csvUploadHandler" },
             { "tag": "button", "id": "showUsersBtn", "textContent": "Show Registered Users", "onclick": "displayUsers" },
-            { "tag": "ul", "id": "usersList" }
-        ]}
+            { "tag": "div", "id": "usersListDiv" }
+        ]},
+        {
+            "tag": "canvas",
+            "id": "gameCanvas",
+            "width": 500,
+            "height": 500,
+            "initialize": "displayHandler.initialize"
+        },
     ]
     
     res.json(pageStructure);

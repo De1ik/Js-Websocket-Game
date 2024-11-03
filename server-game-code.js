@@ -13,6 +13,47 @@ var mid = {
 // };
 
 
+function transformDict(originalDict) {
+    return Object.entries(originalDict).reduce((acc, [id, data]) => {
+        acc[id] = {
+            name: data.name,
+            isRun: data.gameState.isRun,
+        };
+        return acc;
+    }, {});
+}
+
+
+function parseCSV(data, users) {
+    const lines = data.split('\n');
+    const result = [];
+
+    const headers = lines[0].split(',');
+
+    for (let i = 1; i < lines.length; i++) {
+        const row = lines[i].split(',');
+        if (row.length === headers.length) {
+            const user = {
+                name: row[0].trim(),
+                email: row[1].trim(),
+                password: row[2].trim(),
+                maxScore: parseInt(row[3].trim(), 10) || 0,
+                maxSpeed: parseInt(row[4].trim(), 10) || 0
+            };
+
+            const existingUserIndex = users.findIndex(
+                u => u.email === user.email || u.name === user.name
+            );
+
+            if (existingUserIndex !== -1) {
+                users.splice(existingUserIndex, 1);
+            }
+
+            result.push(user);
+        }
+    }
+    return result;
+}
 
 
 
@@ -52,37 +93,23 @@ function endGame (game, users) {
 
     let user = null
     const name = game.name
-    console.log("--------END GAME--------")
-
-    console.log("Users:", users)
-
-    console.log("User:", user)
-    console.log("Name:", name)
 
     if (users && name) {
-        console.log("OK")
         user = users.find(u => u.name === name);
-        console.log("USER2:", user)
     }
 
     if (game.gameState.score > game.gameState.max_score) {
         game.gameState.max_score = game.gameState.score
         if (user) user.maxScore = game.gameState.max_score
-        console.log("NEW Max Score")
     }
     if (game.gameState.speed < game.gameState.max_speed) {
         game.gameState.max_speed = game.gameState.speed
         if (user) user.maxSpeed = game.gameState.max_speed
-        console.log("NEW Max Speed")
     }
     if (user && user.shipImgOption !== game.gameState.shipImgOption){
         user.shipImgOption = game.gameState.shipImgOption
-        console.log("NEW Ship Img")
     }
 
-    console.log("User:", user)
-
-    console.log("----------------------")
 
     game.gameState.isRun = false
     game.ws.send(JSON.stringify({
@@ -235,6 +262,8 @@ function broadcastGameState(game) {
 
 
 module.exports = {
+    transformDict,
+    parseCSV,
     rotateShip,
     addLaser,
     startGame,
