@@ -1,6 +1,0 @@
-table, th, td {
-    min-width: 10px;
-    height: 10px;
-    border: 1px solid black;
-    border-collapse: collapse;
-}
